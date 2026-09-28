@@ -1,0 +1,39 @@
+# Render Blueprint — AndamanTech CRM (Express + MariaDB)
+# ฐานข้อมูลอยู่บน MariaDB เซิร์ฟเวอร์เดียวกับ VMS (141.98.17.115) แต่ database แยก: andamantech_crm
+# ค่า secret (DB_PASSWORD / JWT_SECRET / CRM_PIN) ตั้ง sync:false → ตั้งเองใน dashboard ไม่เก็บลง git
+#
+# บทเรียนจาก medicore_rcm/render.yaml:
+# - hostname .onrender.com ตรึงตอนสร้าง service เปลี่ยนชื่อทีหลังไม่เปลี่ยนตาม
+# - ต้องตรึง NODE_VERSION ไม่งั้น Render หยิบ Node ล่าสุดมาให้
+# - repo private ต้องติดตั้ง Render GitHub App บน repo ก่อน ไม่งั้น clone ไม่ได้และ autoDeploy ไม่ทำงาน
+services:
+  - type: web
+    name: andamantech-crm        # = https://andamantech-crm.onrender.com
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci
+    startCommand: node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "20"
+      - key: DB_HOST
+        value: 141.98.17.115
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: andamantech_crm
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES
+        value: 30d
+      - key: CRM_PIN
+        sync: false

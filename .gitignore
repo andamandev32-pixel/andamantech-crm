@@ -1,0 +1,17 @@
+node_modules/
+.env
+*.log
+.DS_Store
+
+# ข้อมูลลูกค้าจริง — อยู่ในฐานข้อมูล ไม่ใช่ใน git
+*.xlsx
+*.json.bak
+data/
+sale-pipeline*.html
+plan-*.html
+plan-*.txt
+add-tasks-*.js
+DEPLOY-VERCEL.md
+
+.playwright-mcp/
+.vscode/

@@ -247,6 +247,9 @@ textarea.inp{resize:vertical;min-height:64px}
 .chip-btn{border:0;cursor:pointer;font:inherit}
 .chip-btn:hover{background:var(--g200)}
 .chip-btn[aria-pressed="true"]{background:var(--green);color:#fff}
+/* ชื่อลูกค้า/รพ. — ต้องเด่นกว่าป้ายเทาอื่นในแถวเดียวกัน ไม่งั้นกลืนหายไปกับวันที่และสถานะ */
+.chip-cust{background:var(--green-light);color:var(--green-dark);font-weight:600;box-shadow:inset 0 0 0 1px #C6EFD6}
+.chip-cust.chip-btn:hover{background:#DDF5E7}
 
 /* ---------- stat tiles ----------------------------------------------------- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
@@ -4384,7 +4387,7 @@ SP.PlanView = (function () {
     if (!id) return '<span class="badge badge-soft">เรื่องทั่วไป</span>';
     var j = job(id);
     if (!j) return '<span class="badge" style="background:#FEF3F2;color:#B42318">' + U.ic('alert') + 'งานที่อ้างถึงถูกลบ</span>';
-    return '<button class="chip chip-btn tiny" data-act="job:goto" data-id="' + j.id + '" style="padding-left:8px">' +
+    return '<button class="chip chip-btn chip-cust tiny" data-act="job:goto" data-id="' + j.id + '" style="padding-left:8px">' +
            U.ic('hospital') + U.esc(j.customerName) + '</button>';
   }
   function ownerSelect(cur, coll, id, fieldName) {
@@ -5582,7 +5585,7 @@ SP.Cust = (function () {
     if (!id) return '<span class="badge badge-soft">— ไม่ผูกลูกค้า —</span>';
     var c = get(id);
     if (!c) return '<span class="badge" style="background:#FEF3F2;color:#B42318">' + U.ic('alert') + 'ลูกค้าที่อ้างถึงถูกลบ</span>';
-    return '<button class="chip chip-btn tiny" data-act="cust:open" data-id="' + c.id + '" style="padding-left:8px">' +
+    return '<button class="chip chip-btn chip-cust tiny" data-act="cust:open" data-id="' + c.id + '" style="padding-left:8px">' +
            U.ic('hospital') + U.esc(c.name) + '</button>';
   }
 
@@ -5798,7 +5801,7 @@ SP.CustView = (function () {
     var nJobs = SP.Cust.jobs(c.id).length, nAct = SP.Cust.activities(c.id).length;
     return '<tr' + (c.active ? '' : ' style="opacity:.55"') + '>' +
       '<td>' + prioBadge(c.priority) + '</td>' +
-      '<td><button class="chip chip-btn tiny" data-act="cust:open" data-id="' + c.id + '" style="padding-left:8px">' +
+      '<td><button class="chip chip-btn chip-cust tiny" data-act="cust:open" data-id="' + c.id + '" style="padding-left:8px">' +
           U.ic('hospital') + U.esc(c.name) + '</button>' +
         (c.ownerGroup ? '<div class="muted tiny">' + U.esc(c.ownerGroup) + '</div>' : '') + '</td>' +
       '<td>' + U.esc(c.province || '—') + (c.zone ? '<div class="muted tiny">' + U.esc(c.zone) + '</div>' : '') + '</td>' +

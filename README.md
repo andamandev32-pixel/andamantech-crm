@@ -35,4 +35,7 @@ node scripts/import-json.js <ไฟล์.json|.html> --yes    # แทนที
 
 ## Deploy (Render)
 
+URL: https://andamantech-sales.onrender.com (Render web service `andamantech-sales`, region singapore, free)
+
+
 ดู `render.yaml` · secret ที่ต้องตั้งเองใน dashboard: `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `CRM_PIN`

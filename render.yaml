@@ -6,9 +6,14 @@
 # - hostname .onrender.com ตรึงตอนสร้าง service เปลี่ยนชื่อทีหลังไม่เปลี่ยนตาม
 # - ต้องตรึง NODE_VERSION ไม่งั้น Render หยิบ Node ล่าสุดมาให้
 # - repo private ต้องติดตั้ง Render GitHub App บน repo ก่อน ไม่งั้น clone ไม่ได้และ autoDeploy ไม่ทำงาน
+# - 2026-09-29: มี Static Site ชื่อ andamantech-crm ถูกสร้างจาก repo นี้ใน dashboard
+#   Static Site รัน Express ไม่ได้ (ไม่มี Node process) และถ้าลบแล้วเอาชื่อเดิมมาใช้ hostname จะค้างที่ edge
+#   → web service จริงจึงใช้ชื่อ andamantech-sales
+#
+# ⚠ service จริงสร้างผ่าน Render API ไม่ใช่ Blueprint — แก้ไฟล์นี้แล้วของจริงไม่เปลี่ยน ต้องแก้ที่ dashboard ด้วย
 services:
   - type: web
-    name: andamantech-crm        # = https://andamantech-crm.onrender.com
+    name: andamantech-sales      # = https://andamantech-sales.onrender.com (service id srv-datkjh9srm7s73935510)
     runtime: node
     plan: free
     region: singapore

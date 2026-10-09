@@ -378,6 +378,26 @@ table.tbl tbody tr:hover{background:var(--g50)}
 .plan-act{font-size:13px;line-height:1.55}
 .plan-col-ft{border-top:1px solid var(--g200);margin-top:8px;padding-top:8px;font-size:12px;color:var(--g500)}
 
+/* ไทม์ไลน์รายสัปดาห์: [ค้าง] [สัปดาห์ ×4] [ถัดไป] — จอแคบเลื่อนในกรอบ ไม่ให้ทั้งหน้าล้น */
+.plan-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.plan-nav .plan-range{font-size:13px;font-weight:600}
+.plan-tl{
+  display:grid;grid-template-columns:repeat(6,minmax(210px,1fr));gap:10px;
+  overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:4px
+}
+.plan-tl .plan-col{padding:11px;min-width:0;scroll-snap-align:start;transition:background .12s}
+.plan-tl .plan-col-hd h3{font-size:13.5px}
+.plan-tl .plan-item{gap:7px;padding:9px 0}
+.plan-tl .plan-act{font-size:12.5px;line-height:1.5}
+.plan-tl .plan-dates{white-space:normal}
+.plan-col.is-now{border-color:var(--green);box-shadow:inset 0 3px 0 var(--green)}
+.plan-col.is-over{background:#FFFBFA;border-color:#FDA29B}
+.plan-col.is-over .plan-col-hd h3{color:#B42318}
+.plan-col.drop-on{background:var(--green-light);border-style:dashed;border-color:var(--green)}
+.plan-item[draggable="true"]{cursor:grab}
+.plan-item.dragging{opacity:.45}
+.plan-sub-hd{font-size:11.5px;font-weight:600;color:var(--g500);margin:10px 0 0;padding-top:8px;border-top:1px dashed var(--g200)}
+
 /* ---------- discussions ---------------------------------------------------- */
 .disc{border:1px solid var(--g200);border-radius:var(--r-lg);padding:13px 15px;background:var(--surface)}
 .disc.decided{background:var(--g50);border-style:dashed}
@@ -645,6 +665,8 @@ table.tbl tbody tr:hover{background:var(--g50)}
   .fold-ic, .fold-count{display:none !important}
   .tiles{grid-template-columns:repeat(4,1fr)}
   .p-grid{grid-template-columns:repeat(2,1fr)}
+  .plan-tl{grid-template-columns:repeat(6,1fr);overflow:visible;gap:6px}
+  .plan-tl .plan-col{padding:7px}
   a{text-decoration:none;color:inherit}
 }
 .print-only{display:none}
@@ -4247,7 +4269,13 @@ SP.Week = (function () {
     bodyB += sect('clock', 'เดดไลน์ที่ต้องเฝ้า', 'Trial ที่จะครบ · งานที่รอสาธิตนานเกิน · แผนที่มีกำหนดส่ง · การติดต่อที่ต้องตาม (14 วัน)',
                   b1, '', 'deadline', dl.length + ' รายการ');
 
-    var wk = SP.state.plans.filter(function (p) { return p.bucket === 'W1' && !p.done; });
+    /* ตรงกับไทม์ไลน์แผนงาน: งานที่ยังไม่เสร็จ ถึงสิ้นสัปดาห์นี้ (รวมงานค้าง) */
+    var wkEnd = U.monday(U.today()); wkEnd.setDate(wkEnd.getDate() + 7);
+    var wkHi = U.isoDate(wkEnd);
+    var wk = SP.state.plans.filter(function (p) {
+      var k = SP.PlanView.planKey(p);
+      return !p.done && k && k < wkHi;
+    });
     var b2 = wk.length
       ? '<div class="stack">' + wk.map(function (p) {
           var j = p.jobId ? U.byId(SP.state.jobs, p.jobId) : null;
@@ -4453,9 +4481,12 @@ SP.PlanView = (function () {
       U.ic('history') + 'จากการติดต่อ ' + U.esc(U.fmtDate(a.doneDate || a.date)) + '</button>';
   }
 
-  function planRow(p) {
+  /* compact = การ์ดในไทม์ไลน์ คอลัมน์แคบ ~210px จึงเหลือแค่ปุ่มแก้ไข
+     ปุ่ม Google/.ics ยังอยู่ใน drawer แก้ไข · ลากได้เพื่อเลื่อนสัปดาห์ */
+  function planRow(p, compact) {
     var j = job(p.jobId);
-    return '<div class="plan-item' + (p.done ? ' done' : '') + '">' +
+    return '<div class="plan-item' + (p.done ? ' done' : '') + '"' +
+      (compact ? ' draggable="true" data-plan="' + p.id + '" title="ลากไปสัปดาห์อื่นเพื่อเลื่อนวัน"' : '') + '>' +
       '<label class="check" style="margin-top:2px"><input type="checkbox" data-field="plans:' + p.id + ':done"' +
         (p.done ? ' checked' : '') + ' aria-label="ทำเสร็จแล้ว"></label>' +
       /* flex-basis ต้องเป็น 0 ไม่ใช่ auto — พอแถวนี้ wrap ได้ ช่องเนื้อหาที่ตั้ง basis
@@ -4474,7 +4505,7 @@ SP.PlanView = (function () {
         '</div>' +
       '</div>' +
       '<div class="job-acts no-print">' +
-        SP.Cal.rowButtons(p) +
+        (compact ? '' : SP.Cal.rowButtons(p)) +
         '<button class="btn btn-icon btn-ghost muted" data-act="plan:edit" data-id="' + p.id +
           '" title="แก้ไขรายการนี้" aria-label="แก้ไข">' + U.ic('edit') + '</button>' +
       '</div>' +
@@ -4512,12 +4543,6 @@ SP.PlanView = (function () {
     var html =
       '<div class="field"><label>งานที่ต้องทำ</label>' +
         '<textarea class="inp" id="pf-action" rows="3" placeholder="เช่น นัดทีม DEV ประเมินราคา RCM">' + U.esc(p.action) + '</textarea></div>' +
-      '<div class="field"><label>ช่วงเวลา</label><div class="seg" id="pf-bucket">' +
-        C.BUCKETS.map(function (b) {
-          return '<button type="button" data-act="plan:bucket" data-v="' + b.id + '" aria-pressed="' +
-                 (p.bucket === b.id) + '">' + U.esc(b.th) + '</button>';
-        }).join('') + '</div>' +
-        '<div class="hint">' + U.esc(bucketSub(p.bucket)) + '</div></div>' +
       '<div class="field"><label>ผู้รับผิดชอบ</label>' +
         '<select class="inp" id="pf-owner"><option value="">— ไม่ระบุ —</option>' +
         owners.map(function (o) {
@@ -4539,6 +4564,7 @@ SP.PlanView = (function () {
             '<button class="btn btn-xs" data-act="plan:quickdate" data-f="due" data-d="">ล้าง</button>' +
           '</div></div>' +
       '</div>' +
+      '<div class="hint" style="margin:-4px 0 10px">สัปดาห์ในแผนงานดูจากกำหนดเสร็จ (ไม่มีก็ใช้วันเริ่ม) · ไม่ใส่ทั้งสองช่อง = ไปอยู่ "ยังไม่กำหนดวัน"</div>' +
       /* เวลาเป็นตัวเลือก — ถ้าไม่ใส่ถือเป็นงานทั้งวัน ซึ่งเป็นค่าที่ถูกสำหรับงานขายส่วนใหญ่
          ใส่เมื่อไรถึงจะกลายเป็นนัดที่มีเวลาจริงในปฏิทิน */
       '<div class="field-row">' +
@@ -4679,29 +4705,88 @@ SP.PlanView = (function () {
     '</div>';
   }
 
+  /* ---- ไทม์ไลน์รายสัปดาห์ -------------------------------------------------
+     สัปดาห์ของงาน = กำหนดเสร็จ (ไม่มีก็ใช้วันเริ่ม) ตรรกะเดียวกับ SP.Cal.weekPlans
+     และป้ายเลยกำหนดใน planDates · อิงวันนี้ ไม่ใช่ meta.weekOf ที่เป็นสัปดาห์ของเอกสาร */
+  function planKey(p) { return p.dueDate || p.startDate || null; }
+  function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function weekSpan(a) {
+    var b = addDays(a, 6);
+    return (a.getMonth() === b.getMonth()
+      ? a.getDate() + '–' + b.getDate() + ' ' + U.TH_MON[b.getMonth()]
+      : a.getDate() + ' ' + U.TH_MON[a.getMonth()] + ' – ' + b.getDate() + ' ' + U.TH_MON[b.getMonth()]
+    ) + ' ' + (b.getFullYear() + 543);
+  }
+  function weekWindow() {
+    var now = U.monday(U.today());
+    var start = addDays(now, 7 * (SP.ui.planWeekOffset || 0));
+    var weeks = [0, 1, 2, 3].map(function (i) {
+      var mon = addDays(start, 7 * i);
+      return { mon: mon, lo: U.isoDate(mon), hi: U.isoDate(addDays(mon, 7)), isNow: +mon === +now };
+    });
+    return { now: now, start: start, end: addDays(start, 28), lo: weeks[0].lo, hi: weeks[3].hi, weeks: weeks };
+  }
+  /* วันเริ่มของงานที่เพิ่มจากคอลัมน์สัปดาห์ — สัปดาห์นี้ใช้วันนี้ ไม่ย้อนไปวันจันทร์ที่ผ่านไปแล้ว */
+  function weekStartFor(mon) {
+    var t = U.today();
+    return U.isoDate(+U.monday(t) === +mon ? t : mon);
+  }
+
+  function tlCol(o) {
+    var open = o.list.filter(function (p) { return !p.done; });
+    var done = o.list.filter(function (p) { return p.done; });
+    var extra = o.extra || [];
+    var row = function (p) { return planRow(p, true); };
+    return '<div class="plan-col' + (o.cls ? ' ' + o.cls : '') + '"' + (o.drop ? ' data-drop="' + o.drop + '"' : '') + '>' +
+      '<div class="plan-col-hd">' + U.ic(o.icon || 'calendar') + '<h3>' + U.esc(o.title) + '</h3>' +
+        (o.isNow ? '<span class="badge" style="background:var(--green-light);color:var(--green-dark)">สัปดาห์นี้</span>' : '') +
+        '<span class="spacer"></span><span class="badge badge-soft">' + (open.length + extra.length) + '</span></div>' +
+      '<div class="plan-col-sub">' + U.esc(o.sub) + '</div>' +
+      (open.length ? open.map(row).join('')
+        : (extra.length ? '' : '<div class="tiny muted" style="padding:6px 0">' + U.esc(o.empty || 'ยังไม่มีงานในช่วงนี้') + '</div>')) +
+      (extra.length ? '<div class="plan-sub-hd">ยังไม่กำหนดวัน (' + extra.length + ')</div>' + extra.map(row).join('') : '') +
+      (done.length
+        ? '<details style="margin-top:6px"><summary class="tiny muted" style="cursor:pointer">แสดงที่ทำแล้ว (' + done.length + ')</summary>' +
+          done.map(row).join('') + '</details>'
+        : '') +
+      (o.add === undefined ? '' :
+        '<div class="plan-col-ft center no-print">' +
+          '<button class="btn btn-xs" data-act="plan:add" data-start="' + o.add + '">' + U.ic('plus') + 'เพิ่มงาน</button>' +
+        '</div>') +
+    '</div>';
+  }
+
   function render() {
     var kept = SP.state.plans.filter(pMatch);
-    var cols = C.BUCKETS.map(function (b) {
-      var list = kept.filter(function (p) { return p.bucket === b.id; });
-      var open = list.filter(function (p) { return !p.done; });
-      var done = list.filter(function (p) { return p.done; });
-      var val = U.sum(open, function (p) { var j = job(p.jobId); return j ? j.value : 0; });
-      return '<div class="plan-col">' +
-        '<div class="plan-col-hd">' + U.ic('plan') + '<h3>' + U.esc(b.th) + '</h3>' +
-          '<span class="spacer"></span><span class="badge badge-soft">' + open.length + '</span></div>' +
-        '<div class="plan-col-sub">' + U.esc(bucketSub(b.id)) + '</div>' +
-        (open.length ? open.map(planRow).join('') : '<div class="tiny muted" style="padding:6px 0">ยังไม่มีงานในช่วงนี้</div>') +
-        (done.length
-          ? '<details style="margin-top:6px"><summary class="tiny muted" style="cursor:pointer">แสดงที่ทำแล้ว (' + done.length + ')</summary>' +
-            done.map(planRow).join('') + '</details>'
-          : '') +
-        '<div class="plan-col-ft center">' +
-          '<button class="btn btn-xs" data-act="plan:add" data-bucket="' + b.id + '">' + U.ic('plus') + 'เพิ่มงาน</button>' +
-          '<span class="spacer"></span>' +
-          '<span class="mono">' + open.length + ' งาน' + (val ? ' · เกี่ยวข้อง ' + U.esc(U.money(val)) : '') + '</span>' +
-        '</div>' +
+    var w = weekWindow();
+    var lastDay = addDays(w.end, -1);
+    var over = kept.filter(function (p) { var k = planKey(p); return !p.done && k && k < w.lo; });
+    var later = kept.filter(function (p) { var k = planKey(p); return k && k >= w.hi; });
+    var undated = kept.filter(function (p) { return !planKey(p) && !p.done; })
+      .concat(kept.filter(function (p) { return !planKey(p) && p.done; }));
+
+    var cols =
+      tlCol({ title: 'งานค้าง', icon: 'alert', cls: 'is-over', list: over,
+              sub: 'ยังไม่เสร็จ ก่อน ' + U.fmtDate(w.lo), empty: 'ไม่มีงานค้าง' }) +
+      w.weeks.map(function (wk) {
+        return tlCol({
+          title: 'สัปดาห์ที่ ' + U.weekNo(wk.mon), sub: weekSpan(wk.mon), isNow: wk.isNow,
+          cls: wk.isNow ? 'is-now' : '', drop: wk.lo, add: weekStartFor(wk.mon),
+          list: kept.filter(function (p) { var k = planKey(p); return k && k >= wk.lo && k < wk.hi; })
+        });
+      }).join('') +
+      /* งานไม่มีวันที่เสร็จแล้วไม่ต้องโผล่ในกลุ่ม "ยังไม่กำหนดวัน" — พับรวมกับที่ทำแล้ว */
+      tlCol({ title: 'ถัดไป', icon: 'plan', sub: 'หลัง ' + U.fmtDate(lastDay), add: '',
+              list: later.concat(undated.filter(function (p) { return p.done; })),
+              extra: undated.filter(function (p) { return !p.done; }) });
+
+    var nav =
+      '<div class="plan-nav no-print">' +
+        '<button class="btn btn-sm" data-act="plan:wk" data-d="-1" title="ย้อนหนึ่งสัปดาห์" aria-label="ย้อนหนึ่งสัปดาห์">◀</button>' +
+        '<button class="btn btn-sm" data-act="plan:wk" data-d="0"' + (SP.ui.planWeekOffset ? '' : ' disabled') + '>สัปดาห์นี้</button>' +
+        '<button class="btn btn-sm" data-act="plan:wk" data-d="1" title="ถัดไปหนึ่งสัปดาห์" aria-label="ถัดไปหนึ่งสัปดาห์">▶</button>' +
+        '<span class="plan-range">' + U.esc(U.fmtDate(w.lo) + ' – ' + U.fmtDate(lastDay)) + '</span>' +
       '</div>';
-    }).join('');
     /* แถบส่งเข้าปฏิทินเป็นงานปลายทาง ไม่ใช่ตัวกรอง — จัดแผนเสร็จแล้วค่อยส่งออก
        จึงอยู่ท้ายหน้า ไม่ใช่คั่นระหว่างหัวข้อกับคอลัมน์แผน */
     var calMode = SP.Cal.mode();
@@ -4719,27 +4804,95 @@ SP.PlanView = (function () {
                                   : 'ซิงก์สองทางต้องเปิดผ่าน http — ดูวิธีที่หน้าตั้งค่า') + '</span>') +
       '</div>';
     return '<div class="sect-hd"><h2>' + U.ic('plan', 'ic-lg') + 'แผนงาน</h2>' +
-      '<span class="sub">ช่วงเวลาเลือกเอง ไม่ผูกกับวันที่ — เพราะ “ช่วงไหน” คือสิ่งที่ที่ประชุมคุยกันจริง</span></div>' +
+      '<span class="sub">เลื่อน ◀ ▶ ทีละสัปดาห์ · ลากการ์ดไปสัปดาห์อื่นเพื่อเลื่อนวัน</span></div>' +
       planFilterBar(kept.length, SP.state.plans.length) +
-      '<div class="plan-cols">' + cols + '</div>' +
+      nav +
+      '<div class="plan-tl">' + cols + '</div>' +
       calBar;
+  }
+
+  /* ลากการ์ดไปสัปดาห์อื่น = เลื่อนทั้งวันเริ่มและกำหนดเสร็จไปเท่ากัน ความยาวงานคงเดิม
+     งานที่ยังไม่มีวัน ได้วันเริ่มเป็นต้นสัปดาห์นั้น (สัปดาห์นี้ = วันนี้) */
+  function moveToWeek(id, monIso) {
+    var p = U.byId(SP.state.plans, id); if (!p) return;
+    var mon = U.toDate(monIso + 'T00:00:00'); if (!mon) return;
+    var k = planKey(p), ch;
+    if (!k) ch = { startDate: weekStartFor(mon) };
+    else {
+      var shift = U.dayDiff(U.isoDate(U.monday(U.toDate(k + 'T00:00:00'))), monIso);
+      if (!shift) return;
+      ch = {};
+      if (p.startDate) ch.startDate = U.isoDate(addDays(U.toDate(p.startDate + 'T00:00:00'), shift));
+      if (p.dueDate)   ch.dueDate   = U.isoDate(addDays(U.toDate(p.dueDate + 'T00:00:00'), shift));
+    }
+    SP.Store.patch('plans', id, ch);
+    SP.Render.current();
+    SP.Toast.show('ย้ายไปสัปดาห์ ' + weekSpan(mon) + ' แล้ว', 'ok');
   }
 
   return { render:render, jobLabel:jobLabel, ownerSelect:ownerSelect, jobSelect:jobSelect,
            bucketSub:bucketSub, job:job, planDates:planDates, planRow:planRow,
-           openPlanDrawer:openPlanDrawer, setDraftBucket:setDraftBucket };
+           openPlanDrawer:openPlanDrawer, setDraftBucket:setDraftBucket,
+           planKey:planKey, moveToWeek:moveToWeek };
 })();
 
 SP.Render.register('plan', SP.PlanView.render);
 
 SP.Actions.on('plan:add', function (ds) {
+  /* data-start มาจากคอลัมน์ไทม์ไลน์: วันที่ = เพิ่มในสัปดาห์นั้น, ค่าว่าง = คอลัมน์ "ถัดไป" (ไม่ใส่วัน) */
+  var start = ds.start === undefined ? SP.U.isoDate(new Date()) : (ds.start || null);
   var p = SP.Store.add('plans', {
     id: SP.U.uid('P'), seedBatch:'manual', jobId:null, bucket: ds.bucket || 'W1',
     action:'', owner: SP.state.settings.defaultOwner || SP.ui.me || '',
-    startDate: SP.U.isoDate(new Date()), dueDate:null, done:false
+    startDate: start, dueDate:null, done:false
   });
   SP.PlanView.openPlanDrawer(p, true);
 });
+SP.Actions.on('plan:wk', function (ds) {
+  var d = Number(ds.d) || 0;
+  SP.ui.planWeekOffset = d ? (SP.ui.planWeekOffset || 0) + d : 0;
+  SP.Render.current();
+});
+/* ลากการ์ดแผนงานข้ามสัปดาห์ — ผูกที่ document ครั้งเดียว เพราะแท็บ render ใหม่ทั้งก้อนทุกครั้ง
+   วางได้เฉพาะคอลัมน์สัปดาห์ (มี data-drop) · คอลัมน์งานค้าง/ถัดไปไม่ใช่วันที่ที่ชัดเจน */
+(function () {
+  var dragId = null;
+  function col(ev) { var t = ev.target; return t && t.closest ? t.closest('.plan-tl [data-drop]') : null; }
+  function clear() {
+    Array.prototype.forEach.call(document.querySelectorAll('.plan-tl .drop-on'), function (n) { n.classList.remove('drop-on'); });
+  }
+  document.addEventListener('dragstart', function (ev) {
+    var it = ev.target && ev.target.closest ? ev.target.closest('.plan-tl .plan-item[data-plan]') : null;
+    if (!it) return;
+    dragId = it.getAttribute('data-plan');
+    it.classList.add('dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', dragId); } catch (e) {}
+  });
+  document.addEventListener('dragend', function (ev) {
+    var it = ev.target && ev.target.closest ? ev.target.closest('.plan-item') : null;
+    if (it) it.classList.remove('dragging');
+    dragId = null; clear();
+  });
+  document.addEventListener('dragover', function (ev) {
+    if (!dragId) return;
+    var c = col(ev); if (!c) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    if (!c.classList.contains('drop-on')) { clear(); c.classList.add('drop-on'); }
+  });
+  document.addEventListener('dragleave', function (ev) {
+    var c = col(ev);
+    if (c && !c.contains(ev.relatedTarget)) c.classList.remove('drop-on');
+  });
+  document.addEventListener('drop', function (ev) {
+    if (!dragId) return;
+    var c = col(ev); if (!c) return;
+    ev.preventDefault();
+    var id = dragId; dragId = null; clear();
+    SP.PlanView.moveToWeek(id, c.getAttribute('data-drop'));
+  });
+})();
 SP.Actions.on('plan:edit', function (ds) {
   var p = SP.U.byId(SP.state.plans, ds.id);
   if (p) SP.PlanView.openPlanDrawer(p, false);
@@ -6381,9 +6534,6 @@ SP.ActView = (function () {
         '<div class="field-row">' +
           '<div class="field"><label>กำหนดเสร็จ</label><input class="inp" type="date" id="sp-t' + i + '-due" value="' + U.attr(i === 0 ? due : '') + '"></div>' +
           '<div class="field" style="max-width:110px"><label>เวลา</label><input class="inp" type="time" id="sp-t' + i + '-time"></div>' +
-          '<div class="field"><label>ช่วงแผน</label><select class="inp" id="sp-t' + i + '-bucket">' +
-            C.BUCKETS.map(function (b) { return '<option value="' + b.id + '">' + U.esc(b.th) + '</option>'; }).join('') +
-          '</select></div>' +
         '</div></div>';
     }
     SP.Modal.open({
@@ -6404,8 +6554,7 @@ SP.ActView = (function () {
           list.push({
             action: act.value,
             dueDate: (root.querySelector('#sp-t' + i + '-due') || {}).value || null,
-            startTime: (t && t.value) || null,
-            bucket: (root.querySelector('#sp-t' + i + '-bucket') || {}).value || 'W1'
+            startTime: (t && t.value) || null
           });
         }
         if (!list.length) { SP.Toast.show('ยังไม่ได้กรอกงานสักรายการ', 'warn'); return true; }
